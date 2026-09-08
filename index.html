@@ -61,7 +61,7 @@
 
 <h3>Вкладка «Биллинг»</h3>
 <ol>
-  <li>Адрес и валюта ставятся с любой страницы Facebook. <b>Привязка карт — только из Ads Manager</b> (<code>adsmanager.facebook.com</code>): окно платежей Facebook открывает именно там, с <code>business.facebook.com</code> к нему нет доступа — инструмент сам предложит перейти.</li>
+  <li>Адрес и валюта ставятся с любой страницы Facebook. Привязка карт работает из Ads Manager и из настроек бизнеса (<code>business.facebook.com</code>, нужен <code>business_id</code> в адресе страницы или в поле Business ID вкладки «Доступ»). Если Facebook уведёт окно платежей на другой домен, инструмент покажет адрес и предложит перейти в Ads Manager.</li>
   <li><b>Set address</b>: список Account IDs → массово ставит адрес, валюту и часовой пояс. Адрес и пояс выбираются в двух выпадающих списках над полем (Wilmington DE / Manchester NH; Europe/Moscow, America/New_York, Europe/Kiev), выбор запоминается в браузере.</li>
   <li><b>Attach card</b>: Account IDs ↔ Cards построчно, опц. «сделать карту основной».</li>
 </ol>
@@ -535,10 +535,14 @@ return '';
 }
 function billingUrl(accId) {
 var mm = location.pathname.match(/^(.*\/)billing_hub\//);
-var prefix = mm ? mm[1] : (location.hostname.indexOf('adsmanager') >= 0 ? '/adsmanager/' : '/');
-var biz = (location.hostname.indexOf('business.facebook.com') >= 0) ? bizIdForBilling() : '';
+var onBiz = location.hostname.indexOf('business.facebook.com') >= 0;
+// на business.facebook.com «голый» /billing_hub/ Facebook уводит на adsmanager.facebook.com (факт 08.09) —
+// берём маршрут Ads Manager того же домена, чтобы окно осталось в одном origin с главной вкладкой
+var prefix = mm ? mm[1] : ((location.hostname.indexOf('adsmanager') >= 0 || onBiz) ? '/adsmanager/' : '/');
+var biz = onBiz ? bizIdForBilling() : '';
 lastBillingUrl = location.origin + prefix + 'billing_hub/payment_settings/' +
 '?placement=ads_manager' +
+'&act=' + accId +
 '&asset_id=' + accId +
 '&payment_account_id_from_jsmodule=' + accId +
 '&payment_account_id=' + accId +
@@ -665,7 +669,14 @@ while (Date.now() - t0 < 30000) {
 if (cardStopped) throw new Error('stopped');
 if (worker.closed) throw new Error('worker closed');
 if (isCrossOrigin()) {
-throw new Error('Cross-origin block: master=' + location.hostname + '. Окно воркера ушло на другой домен. Открывали: ' + lastBillingUrl + '. Открой сам Billing Hub (adsmanager.facebook.com/adsmanager/billing_hub/… или business.facebook.com/billing_hub/…?business_id=…) и запусти Пульт РК с той же вкладки.');
+var jumpBiz = bizIdForBilling();
+var jumpUrl = 'https://adsmanager.facebook.com/adsmanager/billing_hub/payment_settings/?act=' + (expectedAcc || '') + (jumpBiz ? '&business_id=' + jumpBiz : '');
+log('Окно платежей ушло на другой домен (главная вкладка: ' + location.hostname + '). Открывали: ' + lastBillingUrl, 'warn');
+try { if (worker && !worker.closed) worker.close(); } catch (eC) {}
+if (confirm('Facebook увёл окно платежей на другой домен, отсюда к нему нет доступа. Перейти в Ads Manager (adsmanager.facebook.com) и продолжить там? После загрузки снова открой Пульт РК → Биллинг → Attach card.')) {
+location.href = jumpUrl;
+}
+throw new Error('Cross-origin block: master=' + location.hostname + ', открывали ' + lastBillingUrl);
 }
 try {
 var sameDoc = (worker.__bmNav === navMarker);
@@ -838,16 +849,6 @@ var accs = $('card-accs').value.trim().split(/\s+/)
 var cards = $('card-cards').value.trim().split(/\n+/)
 .map(function (x) { return x.trim(); })
 .filter(function (x) { return x.length > 0; });
-if (location.hostname.indexOf('adsmanager.facebook.com') < 0) {
-var bizGo = bizIdForBilling();
-var goUrl = 'https://adsmanager.facebook.com/adsmanager/billing_hub/payment_settings/' +
-(accs.length ? '?act=' + accs[0] + (bizGo ? '&business_id=' + bizGo : '') : (bizGo ? '?business_id=' + bizGo : ''));
-log('Привязка карт работает только из Ads Manager: окно платежей Facebook открывает на adsmanager.facebook.com, а с ' + location.hostname + ' к нему нет доступа.', 'warn');
-if (confirm('Привязка карт работает только из Ads Manager (adsmanager.facebook.com). Перейти туда сейчас? После загрузки снова открой Пульт РК → Биллинг → Attach card.')) {
-location.href = goUrl;
-}
-return;
-}
 if (accs.length !== cards.length) {
 log('Несовпадение: accounts=' + accs.length + ' cards=' + cards.length, 'err');
 return;
