@@ -536,8 +536,6 @@ return '';
 function billingUrl(accId) {
 var mm = location.pathname.match(/^(.*\/)billing_hub\//);
 var onBiz = location.hostname.indexOf('business.facebook.com') >= 0;
-// на business.facebook.com «голый» /billing_hub/ Facebook уводит на adsmanager.facebook.com (факт 08.09) —
-// берём маршрут Ads Manager того же домена, чтобы окно осталось в одном origin с главной вкладкой
 var prefix = mm ? mm[1] : ((location.hostname.indexOf('adsmanager') >= 0 || onBiz) ? '/adsmanager/' : '/');
 var biz = onBiz ? bizIdForBilling() : '';
 lastBillingUrl = location.origin + prefix + 'billing_hub/payment_settings/' +
