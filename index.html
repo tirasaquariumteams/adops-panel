@@ -718,21 +718,38 @@ d.querySelector('input[aria-label*="ZIP" i]') ||
 d.querySelector('input[aria-label*="Postal" i]')
 };
 }
+function diagWorker(d, stage) {
+try {
+var fr = [].slice.call(d.querySelectorAll('iframe')).map(function (f) { var s = f.getAttribute('src') || ''; try { return s ? new URL(s, d.location.href).host : '(без src)'; } catch (e) { return s.slice(0, 40); } });
+var btns = [].slice.call(d.querySelectorAll('button,[role="button"]')).filter(isVisible).map(function (b) { return (b.textContent || '').trim().slice(0, 30); }).filter(Boolean);
+var inps = [].slice.call(d.querySelectorAll('input')).filter(isVisible).map(function (i) { return (i.getAttribute('name') || i.getAttribute('placeholder') || i.type || '?').slice(0, 24); });
+var dlg = d.querySelector('[role="dialog"]');
+log('  диагностика [' + stage + ']: url=' + String(d.location.href).slice(0, 90), 'muted');
+log('  фреймов ' + fr.length + (fr.length ? ' (' + fr.slice(0, 6).join(', ') + ')' : '') + ' | видимых кнопок ' + btns.length + (btns.length ? ': ' + btns.slice(0, 12).join(' | ') : '') + ' | полей ' + inps.length + (inps.length ? ': ' + inps.slice(0, 8).join(', ') : ''), 'muted');
+if (dlg) log('  диалог: ' + (dlg.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200), 'muted');
+} catch (e) { log('  диагностика не удалась: ' + (e.message || e), 'muted'); }
+}
+async function waitStage(d, stage, predicate, timeoutMs) {
+try { return await waitFor(predicate, timeoutMs); }
+catch (e) { if (!/stopped/.test(String(e.message))) diagWorker(d, stage); throw new Error(stage + ': ' + (e.message || e)); }
+}
 async function attachCard(accId, pan, mmyy, cvc, name, setDefault) {
 await navigateAndWait(billingUrl(accId));
 var d = worker.document;
-var addBtn = await waitFor(function addPaymentMethodBtn() {
+var addBtn = await waitStage(d, 'кнопка Add payment method', function addPaymentMethodBtn() {
 return findByText(d, '[role="button"],button', 'Add payment method') ||
 findByText(d, '[role="button"],button', 'Add payment')        ||
-findByText(d, 'div[role="button"]', 'Add payment');
-}, 25000);
+findByText(d, 'div[role="button"]', 'Add payment') ||
+findByTexts(d, '[role="button"],button', ['Добавить способ оплаты', 'Добавить платёжный', 'Добавить способ']);
+}, 40000);
 addBtn.click();
-await waitFor(function modalAppeared() {
+await waitStage(d, 'окно добавления способа оплаты', function modalAppeared() {
 return findInputs(d).pan ||
 d.querySelector('input[name="AdAccountNewCreditCardOption"]') ||
 findByText(d, 'button,[role="button"]', 'Debit or credit card') ||
-findByText(d, '[role="button"],button', 'Next');
-}, 25000);
+findByTexts(d, 'button,[role="button"]', ['Дебетовая или кредитная карта', 'Банковская карта']) ||
+findByTexts(d, '[role="button"],button', ['Next', 'Далее']);
+}, 60000);
 var creditBtn = findByText(d, 'button,[role="button"]', 'Debit or credit card');
 if (creditBtn) {
 try { creditBtn.click(); } catch (e) {}
@@ -748,9 +765,9 @@ var nextBtn = findByText(d, '[role="button"],button', 'Next');
 if (nextBtn && (!nextBtn.getAttribute || nextBtn.getAttribute('aria-disabled') !== 'true')) {
 nextBtn.click();
 }
-await waitFor(function cardFormAppeared() {
+await waitStage(d, 'форма карты', function cardFormAppeared() {
 return findInputs(d).pan;
-}, 20000);
+}, 40000);
 }
 var inps = findInputs(d);
 if (!inps.pan || !inps.exp || !inps.cvc) {
