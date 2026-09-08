@@ -61,7 +61,7 @@
 
 <h3>Вкладка «Биллинг»</h3>
 <ol>
-  <li>Адрес и валюта ставятся с любой страницы Facebook. Привязка карт исполняется в Ads Manager (<code>adsmanager.facebook.com</code>): Facebook держит окно платежей там, и с другого домена браузер к нему не пускает. С настроек бизнеса запуск тоже работает: инструмент сохраняет задание, переводит вкладку в Ads Manager, после загрузки нажми закладку ещё раз — форма заполнится и запуск продолжится сам.</li>
+  <li>Работает там, где открыт твой Billing Hub — <code>adsmanager.facebook.com</code> или <code>business.facebook.com</code> (worker-вкладка открывается на том же домене).</li>
   <li><b>Set address</b>: список Account IDs → массово ставит адрес, валюту и часовой пояс. Адрес и пояс выбираются в двух выпадающих списках над полем (Wilmington DE / Manchester NH; Europe/Moscow, America/New_York, Europe/Kiev), выбор запоминается в браузере.</li>
   <li><b>Attach card</b>: Account IDs ↔ Cards построчно, опц. «сделать карту основной».</li>
 </ol>
@@ -105,7 +105,7 @@
 
 <script id="src" type="text/plain">javascript:(async()=>{try{
 const host=location.host;const isBiz=/business\.facebook\.com/.test(host);const isAds=/adsmanager\.facebook\.com/.test(host);const isAdsMgr=/adsmanager\.facebook\.com\/adsmanager\//.test(location.href);
-if(!isBiz&&!isAds){alert('Открой business.facebook.com или adsmanager.facebook.com');return}let pultJob=null;try{if(window.name&&window.name.indexOf('PULT_JOB:')===0){pultJob=JSON.parse(window.name.slice(9));window.name='';try{sessionStorage.setItem('pult_job',JSON.stringify(pultJob))}catch(e2){}}}catch(e){pultJob=null}if(!pultJob){try{const sj=sessionStorage.getItem('pult_job');if(sj){const J=JSON.parse(sj);if(J&&J.v===1&&(J.accs||[]).length){if(confirm('Найдено незавершённое задание привязки карт: кабинетов '+J.accs.length+'. Продолжить с места обрыва?'))pultJob=J;else sessionStorage.removeItem('pult_job')}else sessionStorage.removeItem('pult_job')}}catch(e){}}
+if(!isBiz&&!isAds){alert('Открой business.facebook.com или adsmanager.facebook.com');return}
 const H=document.documentElement.innerHTML;
 const dtsg=(H.match(/"DTSGInitialData",\[\],\{"token":"([^"]+)"/)||H.match(/"async_get_token":"([^"]+)"/)||[])[1];
 const lsd=(H.match(/\["LSD",\[\],\{"token":"([^"]+)"/)||H.match(/"lsd":\{"token":"([^"]+)"/)||[])[1];
@@ -303,7 +303,6 @@ idoc.write([
 '      <button id="addr-stop" class="stop" style="display:none">Stop</button>',
 '    </div>',
 '    <div id="tab-card" class="tab">',
-'      <div id="card-hostwarn" style="display:none;background:#fff7e6;border-left:4px solid #f2a93b;padding:8px 10px;border-radius:4px;margin-bottom:8px;font-size:12px">Привязка карт работает только в Ads Manager (adsmanager.facebook.com): окно платежей Facebook живёт там. Заполнять карты лучше сразу оттуда. <button id="card-goads" style="margin-left:8px;background:#1877f2;color:#fff;border:0;padding:5px 10px;border-radius:5px;cursor:pointer;font-weight:600">Открыть Ads Manager</button></div>',
 '      <label>Name on card (одно на все)</label>',
 '      <input type="text" id="card-name" placeholder="John Smith" value="' + (USER_NAME || '').replace(/"/g, '&quot;') + '">',
 '      <label style="font-weight:normal;margin-top:8px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="card-currmonth" style="width:auto"> Подставлять текущий месяц/год (формат: PAN-CVC) &nbsp; Срок (лет): <input type="text" id="card-yearsadd" value="2" style="width:50px;text-align:center"></label>',
@@ -324,19 +323,13 @@ idoc.write([
 idoc.close();
 var $ = function (id) { return idoc.getElementById(id); };
 var $log = $('log');
-var logMirror = true;
 function log(msg, cls) {
 var span = idoc.createElement('span');
 if (cls) span.className = cls;
 span.textContent = msg + '\n';
 $log.appendChild(span);
 $log.scrollTop = $log.scrollHeight;
-if (logMirror) { try { var arr = JSON.parse(sessionStorage.getItem('pult_log') || '[]'); arr.push(msg); if (arr.length > 300) arr = arr.slice(-300); sessionStorage.setItem('pult_log', JSON.stringify(arr)); } catch (eL) {} }
 }
-try {
-var prevLog = JSON.parse(sessionStorage.getItem('pult_log') || '[]');
-if (prevLog.length) { logMirror = false; log('— лог предыдущего запуска (' + prevLog.length + ' строк) —', 'muted'); prevLog.forEach(function (l) { log(l, 'muted'); }); log('— конец предыдущего лога —', 'muted'); logMirror = true; }
-} catch (eP) {}
 $('btn-close').onclick = function () { cardStopped = true; addrStopped = true; if (worker && !worker.closed) { try { worker.close(); } catch (e) {} } host.remove(); billingInited = false; };
 $('btn-min').onclick = function () {
 var b = $('body');
@@ -344,15 +337,6 @@ b.style.display = (b.style.display === 'none') ? '' : 'none';
 };
 $('addr-preset').onchange = function () { var k = $('addr-preset').value; if (ADDR_PRESETS[k]) { addrKey = k; ADDRESS = ADDR_PRESETS[k]; lsSet(LS_PRESET, k); } $('addr-summary').innerHTML = '<b>Будет записано:</b><br>' + addrSummary(); };
 $('addr-tz').onchange = function () { var v = $('addr-tz').value; if (TZ_OPTIONS.indexOf(v) >= 0) { TIMEZONE = v; lsSet(LS_TZ, v); } $('addr-summary').innerHTML = '<b>Будет записано:</b><br>' + addrSummary(); };
-if (location.hostname.indexOf('adsmanager.facebook.com') < 0) {
-$('card-hostwarn').style.display = 'block';
-$('card-goads').onclick = function () {
-var b = bizIdForBilling();
-var first = ($('card-accs').value.trim().split(/\s+/)[0] || '').replace(/^act_/, '');
-var u = /^\d{6,}$/.test(first) ? ('https://adsmanager.facebook.com/adsmanager/billing_hub/accounts/details/?placement=ads_manager&act=' + first + '&asset_id=' + first + '&payment_account_id=' + first + (b ? '&business_id=' + b : '')) : ('https://adsmanager.facebook.com/adsmanager/' + (b ? '?business_id=' + b : ''));
-location.href = u;
-};
-}
 $('t-addr').onclick = function () { $('t-addr').classList.add('active'); $('t-card').classList.remove('active'); $('tab-addr').classList.add('active'); $('tab-card').classList.remove('active'); };
 $('t-card').onclick = function () { $('t-card').classList.add('active'); $('t-addr').classList.remove('active'); $('tab-card').classList.add('active'); $('tab-addr').classList.remove('active'); };
 function buildAddressBody(accId) {
@@ -542,29 +526,17 @@ $('addr-stop').style.display = 'none';
 };
 var worker = null;
 var cardStopped = false;
-var lastBillingUrl = '';
-function bizIdForBilling() {
-var m = (location.search + location.hash).match(/business[_-]id=(\d+)/i);
-if (m) return m[1];
-try { var f = (typeof Q === 'function') ? Q('#fb_biz') : null; if (f && /^\d{6,}$/.test(f.value.trim())) return f.value.trim(); } catch (e) {}
-return '';
-}
 function billingUrl(accId) {
 var mm = location.pathname.match(/^(.*\/)billing_hub\//);
-var onBiz = location.hostname.indexOf('business.facebook.com') >= 0;
-var prefix = mm ? mm[1] : ((location.hostname.indexOf('adsmanager') >= 0 || onBiz) ? '/adsmanager/' : '/');
-var biz = onBiz ? bizIdForBilling() : '';
-lastBillingUrl = location.origin + prefix + 'billing_hub/payment_settings/' +
+var prefix = mm ? mm[1] : (location.hostname.indexOf('adsmanager') >= 0 ? '/adsmanager/' : '/');
+return location.origin + prefix + 'billing_hub/payment_settings/' +
 '?placement=ads_manager' +
-'&act=' + accId +
 '&asset_id=' + accId +
 '&payment_account_id_from_jsmodule=' + accId +
 '&payment_account_id=' + accId +
-(biz ? '&business_id=' + biz : '') +
 '&entrypoint=ads_ecosystem_navigation_ads_billing_tool_plugin' +
 '&locale=en_US' +
 '&_bm=' + Date.now();
-return lastBillingUrl;
 }
 function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 async function waitFor(predicate, timeoutMs, intervalMs) {
@@ -619,10 +591,6 @@ if (r.width === 0 || r.height === 0) return false;
 var st = el.ownerDocument.defaultView.getComputedStyle(el);
 return st.visibility !== 'hidden' && st.display !== 'none';
 }
-function findByTexts(rootDoc, selector, texts, exact) {
-for (var i = 0; i < texts.length; i++) { var el = findByTextVisible(rootDoc, selector, texts[i], exact); if (el) return el; }
-return null;
-}
 function findByTextVisible(rootDoc, selector, text, exact) {
 var els = rootDoc.querySelectorAll(selector);
 var ttext = (text || '').toLowerCase().trim();
@@ -641,7 +609,7 @@ var cb = labels[i].querySelector('input[type="checkbox"]');
 if (cb) return cb;
 }
 }
-var anchor = findByTexts(d, 'span,div,label', ['Set as default', 'Сделать основным', 'Сделать основной', 'Использовать по умолчанию']);
+var anchor = findByTextVisible(d, 'span,div,label', 'Set as default');
 if (anchor) {
 var p = anchor;
 for (var j = 0; j < 5 && p; j++) {
@@ -683,14 +651,7 @@ while (Date.now() - t0 < 30000) {
 if (cardStopped) throw new Error('stopped');
 if (worker.closed) throw new Error('worker closed');
 if (isCrossOrigin()) {
-var jumpBiz = bizIdForBilling();
-var jumpUrl = 'https://adsmanager.facebook.com/adsmanager/billing_hub/accounts/details/?placement=ads_manager&act=' + (expectedAcc || '') + '&asset_id=' + (expectedAcc || '') + '&payment_account_id=' + (expectedAcc || '') + (jumpBiz ? '&business_id=' + jumpBiz : '');
-log('Окно платежей ушло на другой домен (главная вкладка: ' + location.hostname + '). Открывали: ' + lastBillingUrl, 'warn');
-try { if (worker && !worker.closed) worker.close(); } catch (eC) {}
-if (confirm('Facebook увёл окно платежей на другой домен, отсюда к нему нет доступа. Перейти в Ads Manager (adsmanager.facebook.com) и продолжить там? После загрузки снова открой Пульт РК → Биллинг → Attach card.')) {
-location.href = jumpUrl;
-}
-throw new Error('Cross-origin block: master=' + location.hostname + ', открывали ' + lastBillingUrl);
+throw new Error('Cross-origin block: master=' + location.hostname + '. Открой Billing Hub (adsmanager.facebook.com или business.facebook.com) и запусти Пульт РК с той же вкладки.');
 }
 try {
 var sameDoc = (worker.__bmNav === navMarker);
@@ -734,38 +695,21 @@ d.querySelector('input[aria-label*="ZIP" i]') ||
 d.querySelector('input[aria-label*="Postal" i]')
 };
 }
-function diagWorker(d, stage) {
-try {
-var fr = [].slice.call(d.querySelectorAll('iframe')).map(function (f) { var s = f.getAttribute('src') || ''; try { return s ? new URL(s, d.location.href).host : '(без src)'; } catch (e) { return s.slice(0, 40); } });
-var btns = [].slice.call(d.querySelectorAll('button,[role="button"]')).filter(isVisible).map(function (b) { return (b.textContent || '').trim().slice(0, 30); }).filter(Boolean);
-var inps = [].slice.call(d.querySelectorAll('input')).filter(isVisible).map(function (i) { return (i.getAttribute('name') || i.getAttribute('placeholder') || i.type || '?').slice(0, 24); });
-var dlg = d.querySelector('[role="dialog"]');
-log('  диагностика [' + stage + ']: url=' + String(d.location.href).slice(0, 90), 'muted');
-log('  фреймов ' + fr.length + (fr.length ? ' (' + fr.slice(0, 6).join(', ') + ')' : '') + ' | видимых кнопок ' + btns.length + (btns.length ? ': ' + btns.slice(0, 12).join(' | ') : '') + ' | полей ' + inps.length + (inps.length ? ': ' + inps.slice(0, 8).join(', ') : ''), 'muted');
-if (dlg) log('  диалог: ' + (dlg.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200), 'muted');
-} catch (e) { log('  диагностика не удалась: ' + (e.message || e), 'muted'); }
-}
-async function waitStage(d, stage, predicate, timeoutMs) {
-try { return await waitFor(predicate, timeoutMs); }
-catch (e) { if (!/stopped/.test(String(e.message))) diagWorker(d, stage); throw new Error(stage + ': ' + (e.message || e)); }
-}
 async function attachCard(accId, pan, mmyy, cvc, name, setDefault) {
 await navigateAndWait(billingUrl(accId));
 var d = worker.document;
-var addBtn = await waitStage(d, 'кнопка Add payment method', function addPaymentMethodBtn() {
+var addBtn = await waitFor(function addPaymentMethodBtn() {
 return findByText(d, '[role="button"],button', 'Add payment method') ||
 findByText(d, '[role="button"],button', 'Add payment')        ||
-findByText(d, 'div[role="button"]', 'Add payment') ||
-findByTexts(d, '[role="button"],button', ['Добавить способ оплаты', 'Добавить платёжный', 'Добавить способ']);
-}, 40000);
+findByText(d, 'div[role="button"]', 'Add payment');
+}, 25000);
 addBtn.click();
-await waitStage(d, 'окно добавления способа оплаты', function modalAppeared() {
+await waitFor(function modalAppeared() {
 return findInputs(d).pan ||
 d.querySelector('input[name="AdAccountNewCreditCardOption"]') ||
 findByText(d, 'button,[role="button"]', 'Debit or credit card') ||
-findByTexts(d, 'button,[role="button"]', ['Дебетовая или кредитная карта', 'Банковская карта']) ||
-findByTexts(d, '[role="button"],button', ['Next', 'Далее']);
-}, 60000);
+findByText(d, '[role="button"],button', 'Next');
+}, 25000);
 var creditBtn = findByText(d, 'button,[role="button"]', 'Debit or credit card');
 if (creditBtn) {
 try { creditBtn.click(); } catch (e) {}
@@ -781,9 +725,9 @@ var nextBtn = findByText(d, '[role="button"],button', 'Next');
 if (nextBtn && (!nextBtn.getAttribute || nextBtn.getAttribute('aria-disabled') !== 'true')) {
 nextBtn.click();
 }
-await waitStage(d, 'форма карты', function cardFormAppeared() {
+await waitFor(function cardFormAppeared() {
 return findInputs(d).pan;
-}, 40000);
+}, 20000);
 }
 var inps = findInputs(d);
 if (!inps.pan || !inps.exp || !inps.cvc) {
@@ -820,8 +764,7 @@ try { defCb.click(); } catch (e) {}
 await sleep(200);
 }
 }
-var SAVE_TEXTS = ['Save', 'Save and continue', 'Next', 'Add card', 'Add', 'Confirm', 'Continue', 'Done', 'Submit',
-'Сохранить и продолжить', 'Сохранить', 'Далее', 'Добавить карту', 'Добавить', 'Подтвердить', 'Продолжить', 'Готово', 'Отправить'];
+var SAVE_TEXTS = ['Save', 'Save and continue', 'Next', 'Add card', 'Add', 'Confirm', 'Continue', 'Done', 'Submit'];
 var saveBtn = await waitFor(function saveBtnSearch() {
 for (var s = 0; s < SAVE_TEXTS.length; s++) {
 var b = findByTextVisible(d, 'button,[role="button"]', SAVE_TEXTS[s]);
@@ -834,21 +777,22 @@ return null;
 }, 15000);
 saveBtn.click();
 var result = await waitFor(function finalResult() {
-var successText = findByTexts(d, 'div,h1,h2,h3,span', ['successfully saved', 'has been added', 'Card successfully',
-'успешно сохран', 'добавлен', 'Карта успешно', 'способ оплаты добавлен']);
+var successText = findByTextVisible(d, 'div,h1,h2,h3,span', 'successfully saved') ||
+findByTextVisible(d, 'div,h1,h2,h3,span', 'has been added') ||
+findByTextVisible(d, 'div,h1,h2,h3,span', 'Card successfully');
 if (successText) return { type: 'ok' };
 var errEl = d.querySelector('[role="alert"]');
 if (errEl && errEl.textContent && errEl.textContent.trim().length > 4) {
 return { type: 'error', text: errEl.textContent.trim() };
 }
-if (!findInputs(d).pan && !findByTexts(d, 'button,[role="button"]', ['Next', 'Далее'])) {
+if (!findInputs(d).pan && !findByTextVisible(d, 'button,[role="button"]', 'Next')) {
 return { type: 'ok' };
 }
 return null;
 }, 30000, 500);
 if (result.type === 'error') throw new Error('FB: ' + result.text.slice(0, 200));
 await sleep(400);
-var doneBtn = findByTexts(d, 'button,[role="button"]', ['Done', 'Готово']);
+var doneBtn = findByTextVisible(d, 'button,[role="button"]', 'Done');
 if (doneBtn) {
 try { doneBtn.click(); } catch (e) {}
 await sleep(500);
@@ -924,19 +868,6 @@ parsed.push({ pan: pan, mmyy: mmyy, cvc: cvc });
 $('card-run').disabled = true;
 $('card-stop').style.display = 'inline-block';
 cardStopped = false;
-if (location.hostname.indexOf('adsmanager.facebook.com') < 0) {
-var jobBiz = bizIdForBilling();
-var job = { v: 1, from: location.hostname, name: name, accs: accs, cards: cards, currmonth: useCurrentMonth, yearsadd: $('card-yearsadd').value, setdefault: $('card-setdefault').checked, ts: Date.now() };
-var goUrl = 'https://adsmanager.facebook.com/adsmanager/billing_hub/accounts/details/?placement=ads_manager&act=' + accs[0] + '&asset_id=' + accs[0] + '&payment_account_id=' + accs[0] + (jobBiz ? '&business_id=' + jobBiz : '');
-log('Окно платежей Facebook живёт на adsmanager.facebook.com, с этой страницы им управлять нельзя. Переношу задание туда.', 'warn');
-if (confirm('Facebook держит платёжные настройки на adsmanager.facebook.com, с этой страницы окно недоступно. Перейти в Ads Manager с сохранённым заданием (' + accs.length + ' кабинетов)? Дождись полной загрузки страницы и нажми закладку ещё раз — форма заполнится и запуск продолжится сам.')) {
-try { window.name = 'PULT_JOB:' + JSON.stringify(job); } catch (eN) {}
-location.href = goUrl;
-}
-$('card-run').disabled = false; $('card-stop').style.display = 'none';
-return;
-}
-try { sessionStorage.removeItem('pult_log'); } catch (eL0) {}
 log('--- Cards: ' + accs.length + ' pairs ---', 'muted');
 try {
 await ensureWorker();
@@ -947,8 +878,6 @@ return;
 }
 var setDefault = $('card-setdefault').checked;
 var ok = 0, err = 0;
-var jobState = { v: 1, from: location.hostname, name: name, accs: accs.slice(), cards: cards.slice(), currmonth: useCurrentMonth, yearsadd: $('card-yearsadd').value, setdefault: setDefault, ts: Date.now() };
-try { sessionStorage.setItem('pult_job', JSON.stringify(jobState)); } catch (eS) {}
 for (var j = 0; j < accs.length; j++) {
 if (cardStopped) break;
 var accId = accs[j], c = parsed[j];
@@ -963,28 +892,12 @@ log('   ✓ OK' + note, 'ok'); ok++;
 } catch (e) {
 log('   ✗ ' + (e.message || e), 'err'); err++;
 }
-try { jobState.accs = accs.slice(j + 1); jobState.cards = cards.slice(j + 1); if (jobState.accs.length && !cardStopped) sessionStorage.setItem('pult_job', JSON.stringify(jobState)); else sessionStorage.removeItem('pult_job'); } catch (eS2) {}
 await sleep(1500);
 }
-try { sessionStorage.removeItem('pult_job'); } catch (eS3) {}
 log('--- Done. OK=' + ok + ' ERR=' + err + (cardStopped ? ' (stopped)' : '') + ' ---', 'muted');
 $('card-run').disabled = false;
 $('card-stop').style.display = 'none';
 };
-if (window.__pultJob) {
-try {
-var J = window.__pultJob; window.__pultJob = null;
-$('t-card').onclick();
-if (J.name) $('card-name').value = J.name;
-$('card-accs').value = (J.accs || []).join('\n');
-$('card-cards').value = (J.cards || []).join('\n');
-$('card-currmonth').checked = !!J.currmonth;
-if (J.yearsadd) $('card-yearsadd').value = J.yearsadd;
-$('card-setdefault').checked = !!J.setdefault;
-log('Задание перенесено со страницы ' + (J.from || '') + ': кабинетов ' + (J.accs || []).length + '. Старт через 2 секунды…', 'muted');
-setTimeout(function () { $('card-run').onclick(); }, 2000);
-} catch (eJ) { log('Не удалось восстановить перенесённое задание: ' + (eJ.message || eJ), 'err'); }
-}
 }
 const defMode=isAds?'accept':'send';
 const TB='flex:1;padding:11px 6px;border:none;background:none;font-weight:600;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;color:#444';
@@ -1022,7 +935,7 @@ Q('#fb_tabA').onclick=()=>showTab('A');Q('#fb_tabR').onclick=()=>showTab('R');Q(
 const syncMode=()=>{Q('#fb_bizrow').style.display=mode()==='send'?'block':'none';Q('#fb_go').style.background=mode()==='accept'?'#0a8a0a':'#1877f2'};
 const checkAccessHost=()=>{const md=mode();if(md==='send'&&!isBiz){if(confirm('Отправка работает с business.facebook.com. Перейти туда? После загрузки снова открой Пульт РК → Доступ.')){const b=Q('#fb_biz').value.trim();location.href='https://business.facebook.com/latest/settings/ad_accounts'+(b?('?business_id='+b):'')}}else if(md==='accept'&&!isAds){if(confirm('Приём работает с adsmanager.facebook.com. Перейти туда? После загрузки снова открой Пульт РК → Доступ.')){location.href='https://adsmanager.facebook.com/'}}};
 const checkAdsHost=()=>{if(!isAdsMgr){if(confirm('Вкладки ID и Зачистка работают на adsmanager.facebook.com/adsmanager/. Перейти туда? После загрузки снова открой Пульт РК.')){location.href='https://adsmanager.facebook.com/adsmanager/'}}};
-[].forEach.call(m.querySelectorAll('input[name=fb_md]'),el=>el.onchange=()=>{syncMode();checkAccessHost()});syncMode();showTab('A');if(pultJob&&pultJob.v===1){window.__pultJob=pultJob;showTab('B')}
+[].forEach.call(m.querySelectorAll('input[name=fb_md]'),el=>el.onchange=()=>{syncMode();checkAccessHost()});syncMode();showTab('A');
 Q('#fb_close').onclick=()=>{window.__fbStop=true;m.remove()};
 m.addEventListener('click',e=>{if(e.target===m)e.stopPropagation()});
 Q('#fb_go').onclick=async()=>{const md=mode();if(md==='send'&&!isBiz){const b=Q('#fb_biz').value.trim();if(confirm('Сейчас открыта страница приёма. Перейти на business.facebook.com для отправки? После загрузки нажми закладку ещё раз.')){location.href='https://business.facebook.com/latest/settings/ad_accounts'+(b?('?business_id='+b):'')}return}if(md==='accept'&&!isAds){if(confirm('Сейчас открыта страница отправки. Перейти на adsmanager.facebook.com для приёма? После загрузки нажми закладку ещё раз.')){location.href='https://adsmanager.facebook.com/'}return}const ids=Q('#fb_ids').value.split(/[\s,]+/).map(s=>s.replace(/^act_/,'').trim()).filter(Boolean);if(!ids.length){log('Вставь список ID');return}const delay=(parseFloat(Q('#fb_delay').value)||2)*1000;const poll=(parseFloat(Q('#fb_poll').value)||8)*1000;window.__fbStop=false;Q('#fb_go').disabled=true;Q('#fb_stop').disabled=false;Q('#fb_stop').onclick=()=>{window.__fbStop=true};if(md==='send'){const b=Q('#fb_biz').value.trim();if(!b){log('Укажи business_id');Q('#fb_go').disabled=false;Q('#fb_stop').disabled=true;return}let i=0,sent=0,dup=0,errs=0;const st=()=>{Q('#fb_status').textContent='Отправлено: '+sent+' | дубли: '+dup+' | ошибки: '+errs+' | осталось: '+(ids.length-i)};st();log('Старт отправки. Кабинетов: '+ids.length);while(i<ids.length){if(window.__fbStop){log('Остановлено.');break}const acc=ids[i];const r=await send(acc,b);if(r.s==='ok'){sent++;i++;log('OK   act_'+acc);st();await sleep(delay)}else if(r.s==='dup'){dup++;i++;log('SKIP act_'+acc+' (уже запрошен)');st()}else if(r.s==='limit'){Q('#fb_status').textContent='Лимит 2 pending — прими во 2-м профиле. Жду... (отправлено '+sent+', осталось '+(ids.length-i)+')';await sleep(poll)}else{errs++;i++;log('FAIL act_'+acc+': '+r.m);st()}}log('Завершено. Отправлено '+sent+', дубли '+dup+', ошибки '+errs+'.');st()}else{const done=new Set();let round=0;log('Старт приёма. Кабинетов: '+ids.length);while(!window.__fbStop){round++;let waiting=0,errs=0;for(const acc of ids){if(window.__fbStop)break;if(done.has(acc))continue;const r=await accept(acc);if(r.s==='ok'){done.add(acc);log('OK   act_'+acc)}else if(r.s==='none'){waiting++}else{errs++;log('FAIL act_'+acc+': '+r.m)}Q('#fb_status').textContent='Принято '+done.size+'/'+ids.length+' | ждёт '+waiting+' | ошибок в круге '+errs+' | круг '+round;await sleep(delay)}if(done.size>=ids.length){log('Все приняты ('+done.size+').');break}if(window.__fbStop){log('Остановлено.');break}Q('#fb_status').textContent='Принято '+done.size+'/'+ids.length+'. Жду новые запросы... (круг '+round+')';await sleep(poll)}}Q('#fb_go').disabled=false;Q('#fb_stop').disabled=true};
