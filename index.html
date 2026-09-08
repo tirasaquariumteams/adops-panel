@@ -61,7 +61,7 @@
 
 <h3>Вкладка «Биллинг»</h3>
 <ol>
-  <li>Работает там, где открыт твой Billing Hub — <code>adsmanager.facebook.com</code> или <code>business.facebook.com</code> (worker-вкладка открывается на том же домене).</li>
+  <li>Адрес и валюта ставятся с любой страницы Facebook. <b>Привязка карт — только из Ads Manager</b> (<code>adsmanager.facebook.com</code>): окно платежей Facebook открывает именно там, с <code>business.facebook.com</code> к нему нет доступа — инструмент сам предложит перейти.</li>
   <li><b>Set address</b>: список Account IDs → массово ставит адрес, валюту и часовой пояс. Адрес и пояс выбираются в двух выпадающих списках над полем (Wilmington DE / Manchester NH; Europe/Moscow, America/New_York, Europe/Kiev), выбор запоминается в браузере.</li>
   <li><b>Attach card</b>: Account IDs ↔ Cards построчно, опц. «сделать карту основной».</li>
 </ol>
@@ -838,6 +838,16 @@ var accs = $('card-accs').value.trim().split(/\s+/)
 var cards = $('card-cards').value.trim().split(/\n+/)
 .map(function (x) { return x.trim(); })
 .filter(function (x) { return x.length > 0; });
+if (location.hostname.indexOf('adsmanager.facebook.com') < 0) {
+var bizGo = bizIdForBilling();
+var goUrl = 'https://adsmanager.facebook.com/adsmanager/billing_hub/payment_settings/' +
+(accs.length ? '?act=' + accs[0] + (bizGo ? '&business_id=' + bizGo : '') : (bizGo ? '?business_id=' + bizGo : ''));
+log('Привязка карт работает только из Ads Manager: окно платежей Facebook открывает на adsmanager.facebook.com, а с ' + location.hostname + ' к нему нет доступа.', 'warn');
+if (confirm('Привязка карт работает только из Ads Manager (adsmanager.facebook.com). Перейти туда сейчас? После загрузки снова открой Пульт РК → Биллинг → Attach card.')) {
+location.href = goUrl;
+}
+return;
+}
 if (accs.length !== cards.length) {
 log('Несовпадение: accounts=' + accs.length + ' cards=' + cards.length, 'err');
 return;
