@@ -526,17 +526,27 @@ $('addr-stop').style.display = 'none';
 };
 var worker = null;
 var cardStopped = false;
+var lastBillingUrl = '';
+function bizIdForBilling() {
+var m = (location.search + location.hash).match(/business[_-]id=(\d+)/i);
+if (m) return m[1];
+try { var f = (typeof Q === 'function') ? Q('#fb_biz') : null; if (f && /^\d{6,}$/.test(f.value.trim())) return f.value.trim(); } catch (e) {}
+return '';
+}
 function billingUrl(accId) {
 var mm = location.pathname.match(/^(.*\/)billing_hub\//);
 var prefix = mm ? mm[1] : (location.hostname.indexOf('adsmanager') >= 0 ? '/adsmanager/' : '/');
-return location.origin + prefix + 'billing_hub/payment_settings/' +
+var biz = (location.hostname.indexOf('business.facebook.com') >= 0) ? bizIdForBilling() : '';
+lastBillingUrl = location.origin + prefix + 'billing_hub/payment_settings/' +
 '?placement=ads_manager' +
 '&asset_id=' + accId +
 '&payment_account_id_from_jsmodule=' + accId +
 '&payment_account_id=' + accId +
+(biz ? '&business_id=' + biz : '') +
 '&entrypoint=ads_ecosystem_navigation_ads_billing_tool_plugin' +
 '&locale=en_US' +
 '&_bm=' + Date.now();
+return lastBillingUrl;
 }
 function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 async function waitFor(predicate, timeoutMs, intervalMs) {
@@ -655,7 +665,7 @@ while (Date.now() - t0 < 30000) {
 if (cardStopped) throw new Error('stopped');
 if (worker.closed) throw new Error('worker closed');
 if (isCrossOrigin()) {
-throw new Error('Cross-origin block: master=' + location.hostname + '. Открой Billing Hub (adsmanager.facebook.com или business.facebook.com) и запусти Пульт РК с той же вкладки.');
+throw new Error('Cross-origin block: master=' + location.hostname + '. Окно воркера ушло на другой домен. Открывали: ' + lastBillingUrl + '. Открой сам Billing Hub (adsmanager.facebook.com/adsmanager/billing_hub/… или business.facebook.com/billing_hub/…?business_id=…) и запусти Пульт РК с той же вкладки.');
 }
 try {
 var sameDoc = (worker.__bmNav === navMarker);
