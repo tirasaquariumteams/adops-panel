@@ -105,7 +105,7 @@
 
 <script id="src" type="text/plain">javascript:(async()=>{try{
 const host=location.host;const isBiz=/business\.facebook\.com/.test(host);const isAds=/adsmanager\.facebook\.com/.test(host);const isAdsMgr=/adsmanager\.facebook\.com\/adsmanager\//.test(location.href);
-if(!isBiz&&!isAds){alert('Открой business.facebook.com или adsmanager.facebook.com');return}let pultJob=null;try{if(window.name&&window.name.indexOf('PULT_JOB:')===0){pultJob=JSON.parse(window.name.slice(9));window.name=''}}catch(e){pultJob=null}
+if(!isBiz&&!isAds){alert('Открой business.facebook.com или adsmanager.facebook.com');return}let pultJob=null;try{if(window.name&&window.name.indexOf('PULT_JOB:')===0){pultJob=JSON.parse(window.name.slice(9));window.name='';try{sessionStorage.setItem('pult_job',JSON.stringify(pultJob))}catch(e2){}}}catch(e){pultJob=null}if(!pultJob){try{const sj=sessionStorage.getItem('pult_job');if(sj){const J=JSON.parse(sj);if(J&&J.v===1&&(J.accs||[]).length){if(confirm('Найдено незавершённое задание привязки карт: кабинетов '+J.accs.length+'. Продолжить с места обрыва?'))pultJob=J;else sessionStorage.removeItem('pult_job')}else sessionStorage.removeItem('pult_job')}}catch(e){}}
 const H=document.documentElement.innerHTML;
 const dtsg=(H.match(/"DTSGInitialData",\[\],\{"token":"([^"]+)"/)||H.match(/"async_get_token":"([^"]+)"/)||[])[1];
 const lsd=(H.match(/\["LSD",\[\],\{"token":"([^"]+)"/)||H.match(/"lsd":\{"token":"([^"]+)"/)||[])[1];
@@ -323,13 +323,19 @@ idoc.write([
 idoc.close();
 var $ = function (id) { return idoc.getElementById(id); };
 var $log = $('log');
+var logMirror = true;
 function log(msg, cls) {
 var span = idoc.createElement('span');
 if (cls) span.className = cls;
 span.textContent = msg + '\n';
 $log.appendChild(span);
 $log.scrollTop = $log.scrollHeight;
+if (logMirror) { try { var arr = JSON.parse(sessionStorage.getItem('pult_log') || '[]'); arr.push(msg); if (arr.length > 300) arr = arr.slice(-300); sessionStorage.setItem('pult_log', JSON.stringify(arr)); } catch (eL) {} }
 }
+try {
+var prevLog = JSON.parse(sessionStorage.getItem('pult_log') || '[]');
+if (prevLog.length) { logMirror = false; log('— лог предыдущего запуска (' + prevLog.length + ' строк) —', 'muted'); prevLog.forEach(function (l) { log(l, 'muted'); }); log('— конец предыдущего лога —', 'muted'); logMirror = true; }
+} catch (eP) {}
 $('btn-close').onclick = function () { cardStopped = true; addrStopped = true; if (worker && !worker.closed) { try { worker.close(); } catch (e) {} } host.remove(); billingInited = false; };
 $('btn-min').onclick = function () {
 var b = $('body');
@@ -668,7 +674,7 @@ if (cardStopped) throw new Error('stopped');
 if (worker.closed) throw new Error('worker closed');
 if (isCrossOrigin()) {
 var jumpBiz = bizIdForBilling();
-var jumpUrl = 'https://adsmanager.facebook.com/adsmanager/billing_hub/payment_settings/?act=' + (expectedAcc || '') + (jumpBiz ? '&business_id=' + jumpBiz : '');
+var jumpUrl = 'https://adsmanager.facebook.com/adsmanager/billing_hub/accounts/details/?placement=ads_manager&act=' + (expectedAcc || '') + '&asset_id=' + (expectedAcc || '') + '&payment_account_id=' + (expectedAcc || '') + (jumpBiz ? '&business_id=' + jumpBiz : '');
 log('Окно платежей ушло на другой домен (главная вкладка: ' + location.hostname + '). Открывали: ' + lastBillingUrl, 'warn');
 try { if (worker && !worker.closed) worker.close(); } catch (eC) {}
 if (confirm('Facebook увёл окно платежей на другой домен, отсюда к нему нет доступа. Перейти в Ads Manager (adsmanager.facebook.com) и продолжить там? После загрузки снова открой Пульт РК → Биллинг → Attach card.')) {
@@ -911,15 +917,16 @@ cardStopped = false;
 if (location.hostname.indexOf('adsmanager.facebook.com') < 0) {
 var jobBiz = bizIdForBilling();
 var job = { v: 1, from: location.hostname, name: name, accs: accs, cards: cards, currmonth: useCurrentMonth, yearsadd: $('card-yearsadd').value, setdefault: $('card-setdefault').checked, ts: Date.now() };
-var goUrl = 'https://adsmanager.facebook.com/adsmanager/billing_hub/payment_settings/?act=' + accs[0] + (jobBiz ? '&business_id=' + jobBiz : '');
+var goUrl = 'https://adsmanager.facebook.com/adsmanager/billing_hub/accounts/details/?placement=ads_manager&act=' + accs[0] + '&asset_id=' + accs[0] + '&payment_account_id=' + accs[0] + (jobBiz ? '&business_id=' + jobBiz : '');
 log('Окно платежей Facebook живёт на adsmanager.facebook.com, с этой страницы им управлять нельзя. Переношу задание туда.', 'warn');
-if (confirm('Facebook держит платёжные настройки на adsmanager.facebook.com, с этой страницы окно недоступно. Перейти в Ads Manager с сохранённым заданием (' + accs.length + ' кабинетов)? После загрузки нажми закладку ещё раз — форма заполнится и запуск продолжится сам.')) {
+if (confirm('Facebook держит платёжные настройки на adsmanager.facebook.com, с этой страницы окно недоступно. Перейти в Ads Manager с сохранённым заданием (' + accs.length + ' кабинетов)? Дождись полной загрузки страницы и нажми закладку ещё раз — форма заполнится и запуск продолжится сам.')) {
 try { window.name = 'PULT_JOB:' + JSON.stringify(job); } catch (eN) {}
 location.href = goUrl;
 }
 $('card-run').disabled = false; $('card-stop').style.display = 'none';
 return;
 }
+try { sessionStorage.removeItem('pult_log'); } catch (eL0) {}
 log('--- Cards: ' + accs.length + ' pairs ---', 'muted');
 try {
 await ensureWorker();
@@ -930,6 +937,8 @@ return;
 }
 var setDefault = $('card-setdefault').checked;
 var ok = 0, err = 0;
+var jobState = { v: 1, from: location.hostname, name: name, accs: accs.slice(), cards: cards.slice(), currmonth: useCurrentMonth, yearsadd: $('card-yearsadd').value, setdefault: setDefault, ts: Date.now() };
+try { sessionStorage.setItem('pult_job', JSON.stringify(jobState)); } catch (eS) {}
 for (var j = 0; j < accs.length; j++) {
 if (cardStopped) break;
 var accId = accs[j], c = parsed[j];
@@ -944,8 +953,10 @@ log('   ✓ OK' + note, 'ok'); ok++;
 } catch (e) {
 log('   ✗ ' + (e.message || e), 'err'); err++;
 }
+try { jobState.accs = accs.slice(j + 1); jobState.cards = cards.slice(j + 1); if (jobState.accs.length && !cardStopped) sessionStorage.setItem('pult_job', JSON.stringify(jobState)); else sessionStorage.removeItem('pult_job'); } catch (eS2) {}
 await sleep(1500);
 }
+try { sessionStorage.removeItem('pult_job'); } catch (eS3) {}
 log('--- Done. OK=' + ok + ' ERR=' + err + (cardStopped ? ' (stopped)' : '') + ' ---', 'muted');
 $('card-run').disabled = false;
 $('card-stop').style.display = 'none';
