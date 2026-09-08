@@ -303,6 +303,7 @@ idoc.write([
 '      <button id="addr-stop" class="stop" style="display:none">Stop</button>',
 '    </div>',
 '    <div id="tab-card" class="tab">',
+'      <div id="card-hostwarn" style="display:none;background:#fff7e6;border-left:4px solid #f2a93b;padding:8px 10px;border-radius:4px;margin-bottom:8px;font-size:12px">Привязка карт работает только в Ads Manager (adsmanager.facebook.com): окно платежей Facebook живёт там. Заполнять карты лучше сразу оттуда. <button id="card-goads" style="margin-left:8px;background:#1877f2;color:#fff;border:0;padding:5px 10px;border-radius:5px;cursor:pointer;font-weight:600">Открыть Ads Manager</button></div>',
 '      <label>Name on card (одно на все)</label>',
 '      <input type="text" id="card-name" placeholder="John Smith" value="' + (USER_NAME || '').replace(/"/g, '&quot;') + '">',
 '      <label style="font-weight:normal;margin-top:8px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="card-currmonth" style="width:auto"> Подставлять текущий месяц/год (формат: PAN-CVC) &nbsp; Срок (лет): <input type="text" id="card-yearsadd" value="2" style="width:50px;text-align:center"></label>',
@@ -343,6 +344,15 @@ b.style.display = (b.style.display === 'none') ? '' : 'none';
 };
 $('addr-preset').onchange = function () { var k = $('addr-preset').value; if (ADDR_PRESETS[k]) { addrKey = k; ADDRESS = ADDR_PRESETS[k]; lsSet(LS_PRESET, k); } $('addr-summary').innerHTML = '<b>Будет записано:</b><br>' + addrSummary(); };
 $('addr-tz').onchange = function () { var v = $('addr-tz').value; if (TZ_OPTIONS.indexOf(v) >= 0) { TIMEZONE = v; lsSet(LS_TZ, v); } $('addr-summary').innerHTML = '<b>Будет записано:</b><br>' + addrSummary(); };
+if (location.hostname.indexOf('adsmanager.facebook.com') < 0) {
+$('card-hostwarn').style.display = 'block';
+$('card-goads').onclick = function () {
+var b = bizIdForBilling();
+var first = ($('card-accs').value.trim().split(/\s+/)[0] || '').replace(/^act_/, '');
+var u = /^\d{6,}$/.test(first) ? ('https://adsmanager.facebook.com/adsmanager/billing_hub/accounts/details/?placement=ads_manager&act=' + first + '&asset_id=' + first + '&payment_account_id=' + first + (b ? '&business_id=' + b : '')) : ('https://adsmanager.facebook.com/adsmanager/' + (b ? '?business_id=' + b : ''));
+location.href = u;
+};
+}
 $('t-addr').onclick = function () { $('t-addr').classList.add('active'); $('t-card').classList.remove('active'); $('tab-addr').classList.add('active'); $('tab-card').classList.remove('active'); };
 $('t-card').onclick = function () { $('t-card').classList.add('active'); $('t-addr').classList.remove('active'); $('tab-card').classList.add('active'); $('tab-addr').classList.remove('active'); };
 function buildAddressBody(accId) {
