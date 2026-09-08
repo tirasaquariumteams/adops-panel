@@ -591,6 +591,10 @@ if (r.width === 0 || r.height === 0) return false;
 var st = el.ownerDocument.defaultView.getComputedStyle(el);
 return st.visibility !== 'hidden' && st.display !== 'none';
 }
+function findByTexts(rootDoc, selector, texts, exact) {
+for (var i = 0; i < texts.length; i++) { var el = findByTextVisible(rootDoc, selector, texts[i], exact); if (el) return el; }
+return null;
+}
 function findByTextVisible(rootDoc, selector, text, exact) {
 var els = rootDoc.querySelectorAll(selector);
 var ttext = (text || '').toLowerCase().trim();
@@ -609,7 +613,7 @@ var cb = labels[i].querySelector('input[type="checkbox"]');
 if (cb) return cb;
 }
 }
-var anchor = findByTextVisible(d, 'span,div,label', 'Set as default');
+var anchor = findByTexts(d, 'span,div,label', ['Set as default', 'Сделать основным', 'Сделать основной', 'Использовать по умолчанию']);
 if (anchor) {
 var p = anchor;
 for (var j = 0; j < 5 && p; j++) {
@@ -764,7 +768,8 @@ try { defCb.click(); } catch (e) {}
 await sleep(200);
 }
 }
-var SAVE_TEXTS = ['Save', 'Save and continue', 'Next', 'Add card', 'Add', 'Confirm', 'Continue', 'Done', 'Submit'];
+var SAVE_TEXTS = ['Save', 'Save and continue', 'Next', 'Add card', 'Add', 'Confirm', 'Continue', 'Done', 'Submit',
+'Сохранить и продолжить', 'Сохранить', 'Далее', 'Добавить карту', 'Добавить', 'Подтвердить', 'Продолжить', 'Готово', 'Отправить'];
 var saveBtn = await waitFor(function saveBtnSearch() {
 for (var s = 0; s < SAVE_TEXTS.length; s++) {
 var b = findByTextVisible(d, 'button,[role="button"]', SAVE_TEXTS[s]);
@@ -777,22 +782,21 @@ return null;
 }, 15000);
 saveBtn.click();
 var result = await waitFor(function finalResult() {
-var successText = findByTextVisible(d, 'div,h1,h2,h3,span', 'successfully saved') ||
-findByTextVisible(d, 'div,h1,h2,h3,span', 'has been added') ||
-findByTextVisible(d, 'div,h1,h2,h3,span', 'Card successfully');
+var successText = findByTexts(d, 'div,h1,h2,h3,span', ['successfully saved', 'has been added', 'Card successfully',
+'успешно сохран', 'добавлен', 'Карта успешно', 'способ оплаты добавлен']);
 if (successText) return { type: 'ok' };
 var errEl = d.querySelector('[role="alert"]');
 if (errEl && errEl.textContent && errEl.textContent.trim().length > 4) {
 return { type: 'error', text: errEl.textContent.trim() };
 }
-if (!findInputs(d).pan && !findByTextVisible(d, 'button,[role="button"]', 'Next')) {
+if (!findInputs(d).pan && !findByTexts(d, 'button,[role="button"]', ['Next', 'Далее'])) {
 return { type: 'ok' };
 }
 return null;
 }, 30000, 500);
 if (result.type === 'error') throw new Error('FB: ' + result.text.slice(0, 200));
 await sleep(400);
-var doneBtn = findByTextVisible(d, 'button,[role="button"]', 'Done');
+var doneBtn = findByTexts(d, 'button,[role="button"]', ['Done', 'Готово']);
 if (doneBtn) {
 try { doneBtn.click(); } catch (e) {}
 await sleep(500);
